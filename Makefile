@@ -6,94 +6,37 @@
 #
 
 CC = g++
-JAVAC = $(JAVA_HOME)/bin/javac
-JAVA = $(JAVA_HOME)/bin/java
-JAR = $(JAVA_HOME)/bin/jar
-JAVADOC = $(JAVA_HOME)/bin/javadoc
+ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 JNI_INCLUDES = $(JAVA_HOME)/include $(JAVA_HOME)/include/linux
 
 CFLAGS = -O3 -DNDEBUG -fPIC
-JAVAFLAGS = -Xlint:unchecked -proc:none -XDenableSunApiLintControl
 LINK_FLAGS = -fPIC -O3 -DNDEBUG -shared -lpmem -lpmemobj -Wl,-rpath,/usr/local/lib:/usr/local/lib64
 
 CPP_SOURCE_DIR = src/main/cpp
-JAVA_SOURCE_DIR = src/main/java
-PACKAGE_NAME = lib/llpl
-
-TEST_DIR = src/test/java/$(PACKAGE_NAME)
-
-TARGET_DIR = target
+TARGET_DIR = bin
 CPP_BUILD_DIR = $(TARGET_DIR)/cppbuild
-CLASSES_DIR = $(TARGET_DIR)/classes
-TEST_CLASSES_DIR = $(TARGET_DIR)/test_classes
-
 BASE_CLASSPATH = $(CLASSES_DIR):lib
-
+ARCH = $(shell $(CC) -dumpmachine | awk -F'[/-]' '{print $$1}')
 ALL_CPP_SOURCES = $(wildcard $(CPP_SOURCE_DIR)/*.cpp)
-ALL_JAVA_SOURCES = $(wildcard $(JAVA_SOURCE_DIR)/$(PACKAGE_NAME)/*.java)
 ALL_OBJ = $(addprefix $(CPP_BUILD_DIR)/, $(notdir $(ALL_CPP_SOURCES:.cpp=.o)))
+SO_FILE_NAME = libllpl-$(ARCH).so
+LIBRARIES = $(addprefix $(CPP_BUILD_DIR)/, $(SO_FILE_NAME))
 
-ALL_TEST_SOURCES = $(addprefix $(TEST_DIR)/, \
-	CopyMemoryTest.java \
-	PersistentMemoryBlockTest.java \
-	MemoryBlockCollectionTest.java \
-	MemoryBlockFreeTest.java \
-	MemoryBlockEqualityTest.java \
-	MemoryBlockTest.java \
-	MultipleHeapTest.java \
-	MultipleTransactionalHeapTest.java \
-	SetMemoryTest.java \
-	TransactionTest.java \
-	TransactionalMemoryBlockTest.java \
-	UnboundedMemoryBlockTest.java \
-	)
 
-#	TransactionPerfTest.java \
-#	DurablePerfTest.java \
-
-ALL_TEST_CLASSES = $(addprefix $(TEST_CLASSES_DIR)/, $(notdir $(ALL_TEST_SOURCES:.java=.class)))
-ALL_PERF_TEST_CLASSES = $(addprefix $(TEST_CLASSES_DIR)/, $(notdir $(ALL_PERF_TEST_SOURCES:.java=.class)))
-
-LIBRARIES = $(addprefix $(CPP_BUILD_DIR)/, libllpl.so)
-
-EXAMPLES_DIR = src/examples
-ALL_EXAMPLE_DIRS = $(wildcard $(EXAMPLES_DIR)/*)
-#$(addprefix $(EXAMPLES_DIR)/, reservations employees)
-
-all: sources examples testsources
-sources: cpp java
+all: sources
+sources: cpp
 cpp: $(LIBRARIES)
-java: classes
-docs: classes
-	$(JAVADOC) -d  docs lib.llpl -sourcepath $(JAVA_SOURCE_DIR)
-jar: sources
-	$(JAR) cvf $(TARGET_DIR)/llpl.jar -C $(CLASSES_DIR) lib/ 		
 
-examples: sources
-	$(foreach example_dir,$(ALL_EXAMPLE_DIRS), $(JAVAC) $(JAVAFLAGS) -cp $(BASE_CLASSPATH):$(example_dir) $(example_dir)/*.java;)
-
-testsources: sources
-	$(JAVAC) $(JAVAFLAGS) -cp $(BASE_CLASSPATH):src -d $(TEST_CLASSES_DIR) $(TEST_DIR)/*.java;
-
-clean: cleanex
-	rm -rf target
-
-cleanex:
-	$(foreach example_dir,$(ALL_EXAMPLE_DIRS), rm -rf $(example_dir)/*.class;)
-
-tests: $(ALL_TEST_CLASSES)
-	$(foreach test,$^, $(JAVA) -ea -cp $(BASE_CLASSPATH):$(TEST_CLASSES_DIR) -Djava.library.path=$(CPP_BUILD_DIR) $(PACKAGE_NAME)/$(notdir $(test:.class=));)
+clean:
+	rm -rf $(TARGET_DIR)
 
 $(LIBRARIES): | $(CPP_BUILD_DIR)
 $(ALL_OBJ): | $(CPP_BUILD_DIR)
-$(ALL_TEST_CLASSES): | $(TEST_CLASSES_DIR)
-
-classes: | $(CLASSES_DIR) $(TEST_CLASSES_DIR)
-	$(JAVAC) $(JAVAFLAGS) -d $(CLASSES_DIR) -cp $(BASE_CLASSPATH) $(ALL_JAVA_SOURCES)
 
 $(CPP_BUILD_DIR)/%.so: $(ALL_OBJ)
 	$(CC) -Wl,-soname,$@ -o $@ $(ALL_OBJ) $(LINK_FLAGS)
+	cp $(CPP_BUILD_DIR)/$(SO_FILE_NAME) $(ROOT_DIR)/src/main/resources/lib/$(SO_FILE_NAME)
 
 $(CPP_BUILD_DIR)/%.o: $(CPP_SOURCE_DIR)/%.cpp
 ifndef JAVA_HOME
@@ -103,9 +46,3 @@ endif
 
 $(CPP_BUILD_DIR):
 	mkdir -p $(CPP_BUILD_DIR)
-
-$(CLASSES_DIR):
-	mkdir -p $(CLASSES_DIR)
-
-$(TEST_CLASSES_DIR):
-	mkdir -p $(TEST_CLASSES_DIR)

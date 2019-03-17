@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.Arrays;
 import java.io.File;
 import sun.misc.Unsafe;
 
@@ -19,8 +18,10 @@ import sun.misc.Unsafe;
  * The base class for all heap classes.  A heap contains memory allocated in units of memory blocks.
  */
 public abstract class AnyHeap {
+
     static {
-        System.loadLibrary("llpl");
+        NativeLibrary.load();
+
         try {
             java.lang.reflect.Field f = Unsafe.class.getDeclaredField("theUnsafe");
             f.setAccessible(true);
@@ -34,7 +35,7 @@ public abstract class AnyHeap {
     private static final int TOTAL_ALLOCATION_CLASSES = 40;
     private static final int USER_CLASS_INDEX = 15;
     private static final int MAX_USER_CLASSES = (TOTAL_ALLOCATION_CLASSES - USER_CLASS_INDEX) / 2;
-    static Unsafe UNSAFE;
+    public static Unsafe UNSAFE;
     private static final Map<String, AnyHeap> heaps = new HashMap<>();
     private boolean open;
     private final String path;

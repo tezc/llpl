@@ -25,10 +25,6 @@ import java.util.function.Consumer;
  * the body.
  */
 public final class Transaction {
-    static {
-        System.loadLibrary("llpl");
-    }
-
     private State state; 
     private int depth;
     private final boolean doStart;

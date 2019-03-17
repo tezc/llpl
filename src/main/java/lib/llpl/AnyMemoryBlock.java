@@ -29,10 +29,6 @@ public abstract class AnyMemoryBlock {
     private long address;       // TODO: consider rename to offset or blockOffset
     private long directAddress; // TODO: consider rename to address or blockAddress
 
-    static {
-        System.loadLibrary("llpl");
-    }
-
     // Constructor
     AnyMemoryBlock(AnyHeap heap, long size, boolean bounded, boolean transactional) {
         this.heap = heap;
