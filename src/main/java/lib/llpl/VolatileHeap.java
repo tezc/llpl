@@ -1,28 +1,39 @@
 package lib.llpl;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.UUID;
 
 public class VolatileHeap {
     static {
         NativeLibrary.load();
     }
 
-    private static final Object lock = new Object();
+    //This is approximation to overhead of libmemobj, no details are known
+    //just relies on observation.
+    private static final int FILE_SIZE_OVERHEAD = 10 * 1024 * 1024;
 
-    private final String path;
+    private static final Object lock = new Object();
+    private final Object closeLock = new Object();
+
+    private final Path path;
     private final long size;
     private final long poolHandle;
+    private boolean open;
 
-    public VolatileHeap(String path, long size) throws IOException {
+    private VolatileHeap(Path path, long size, long poolHandle) {
         this.path = path;
         this.size = size;
-        this.poolHandle = openHeap(path, size);
+        this.poolHandle = poolHandle;
+        this.open = true;
     }
 
-    private static long openHeap(String path, long size) throws IOException {
-        Files.deleteIfExists(Paths.get(path));
+    public static VolatileHeap openHeap(String path, long size) throws IOException {
+        size += FILE_SIZE_OVERHEAD;
 
         synchronized (lock) {
             long poolHandle = nativeOpenHeap(path, size);
@@ -30,47 +41,38 @@ public class VolatileHeap {
                 throw new IOException("Failed to open heap at : " + path);
             }
 
+            VolatileHeap heap = new VolatileHeap(Paths.get(path), size, poolHandle);
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try {
-                    Files.deleteIfExists(Paths.get(path));
-                }
-                catch (IOException e) {
-                    //ignore
-                }
+                heap.close();
             }));
 
-            return poolHandle;
+            return heap;
         }
     }
 
     public void close() {
-        if (poolHandle != 0) {
-            nativeCloseHeap(poolHandle);
+        synchronized (closeLock) {
+            if (open) {
+                nativeCloseHeap(poolHandle);
 
-            try {
-                Files.deleteIfExists(Paths.get(path));
-            }
-            catch (IOException e) {
-                //ignore
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    //ignore
+                }
+
+                open = false;
             }
         }
     }
 
     public long allocate(long size) {
         long offset = nativeAlloc(poolHandle, size);
-        if (offset == 0) {
-            throw new OutOfMemoryError("Failed to allocate memory at : " + path);
-        }
-
         return poolHandle + offset;
     }
 
     public long realloc(long addr, long size) {
         long offset = nativeRealloc(poolHandle, addr, size);
-        if (offset == 0) {
-            throw new OutOfMemoryError("Failed to realloc memory at : " + path);
-        }
-
         return poolHandle + offset;
     }
 
