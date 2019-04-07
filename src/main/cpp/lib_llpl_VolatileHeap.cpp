@@ -7,7 +7,7 @@
 
 #include "lib_llpl_VolatileHeap.h"
 
-const char *layout_name = "llpl_unmanaged_heap";
+const char *volatile_layout_name = "llpl_volatile_heap";
 
 void throw_OOM(JNIEnv *env)
 {
@@ -24,9 +24,9 @@ JNIEXPORT jlong JNICALL Java_lib_llpl_VolatileHeap_nativeOpenHeap
 {
     const char* native_string = env->GetStringUTFChars(path, 0);
 
-    PMEMobjpool *pool = pmemobj_open(native_string, layout_name);
+    PMEMobjpool *pool = pmemobj_open(native_string, volatile_layout_name);
     if (pool == NULL) {
-        pool = pmemobj_create(native_string, layout_name, (size_t) size, S_IRUSR | S_IWUSR);
+        pool = pmemobj_create(native_string, volatile_layout_name, (size_t) size, S_IRUSR | S_IWUSR);
     }
 
     if (pool != NULL) {
